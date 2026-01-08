@@ -27,6 +27,16 @@ docker-compose up --build
 
 The first user to register automatically becomes an admin.
 
+### Role-Based Permissions
+
+| Role        | Config Page | Edit Config | View Users | Change Roles | Edit Own Profile |
+| ----------- | ----------- | ----------- | ---------- | ------------ | ---------------- |
+| **Admin**   | ✅          | ✅          | ✅         | ✅           | ✅               |
+| **Manager** | ✅          | ❌          | ✅         | ❌           | ✅               |
+| **Editor**  | ❌          | ❌          | ✅         | ❌           | ✅               |
+| **User**    | ❌          | ❌          | ❌         | ❌           | ✅               |
+| **Viewer**  | ❌          | ❌          | ❌         | ❌           | ❌               |
+
 ## Pages
 
 | Page    | Path      | Description                 |
