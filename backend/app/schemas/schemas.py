@@ -6,6 +6,12 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    department: Optional[str] = None
+    job_title: Optional[str] = None
+    date_of_birth: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -13,6 +19,12 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    department: Optional[str] = None
+    job_title: Optional[str] = None
+    date_of_birth: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int

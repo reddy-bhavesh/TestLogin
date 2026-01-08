@@ -35,6 +35,32 @@ The first user to register automatically becomes an admin.
 | Profile | `/forms`  | Edit user profile           |
 | Config  | `/config` | Admin settings (admin only) |
 
+## Audit Logging
+
+### Backend (Python)
+
+- JSON-formatted logs to stdout using `python-json-logger`
+- Azure Container Apps captures these automatically to Log Analytics
+- Logs include: `Admin_User`, `Action`, `Target_Tenant`, `Target_User`
+
+### Frontend (React)
+
+- Application Insights SDK for browser events
+- Set `VITE_APP_INSIGHTS_CONNECTION_STRING` env var to enable
+
+### KQL Query for Azure Log Analytics
+
+```kql
+ContainerAppConsoleLogs_CL
+| extend d = parse_json(Log_s)
+| project Time = TimeGenerated,
+    Admin = tostring(d.Admin_User),
+    Action = tostring(d.Action),
+    Target = tostring(d.Target_User)
+| where isnotempty(Admin)
+| order by Time desc
+```
+
 ## Azure Deployment
 
 ```bash
@@ -55,7 +81,7 @@ docker build -t pocwebappacr.azurecr.io/frontend:v1 ./frontend
 docker push pocwebappacr.azurecr.io/backend:v1
 docker push pocwebappacr.azurecr.io/frontend:v1
 
-# 4. Deploy to Container Apps
+# 4. Deploy to Container Apps (logs auto-route to Log Analytics)
 az containerapp env create -n poc-env -g poc-webapp-rg -l centralindia
 az containerapp create -n poc-backend -g poc-webapp-rg --environment poc-env \
   --image pocwebappacr.azurecr.io/backend:v1 --target-port 8000 --ingress internal \
@@ -66,7 +92,8 @@ az containerapp create -n poc-frontend -g poc-webapp-rg --environment poc-env \
 
 ## Tech Stack
 
-- **Frontend**: React 18 + Vite
-- **Backend**: Python FastAPI
+- **Frontend**: React 18 + Vite + Application Insights
+- **Backend**: Python FastAPI + JSON Logging
 - **Database**: PostgreSQL 16
 - **Auth**: JWT tokens
+- **Logging**: Azure Log Analytics (immutable audit trail)

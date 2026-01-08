@@ -6,6 +6,8 @@ from app.models.database import get_db
 from app.models.user import User, UserRole, SystemConfig
 from app.schemas import ConfigItem, ConfigResponse
 from app.routers.auth import get_current_user
+from app.audit_logger import log_config_change
+from app.permissions import can_access_config, can_edit_config
 
 router = APIRouter()
 
@@ -31,6 +33,9 @@ def get_all_configs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if not can_access_config(current_user.role):
+        raise HTTPException(status_code=403, detail="You don't have permission to view configuration")
+    
     init_default_configs(db)
     configs = db.query(SystemConfig).all()
     return configs
@@ -53,10 +58,12 @@ def update_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != UserRole.ADMIN.value:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not can_edit_config(current_user.role):
+        raise HTTPException(status_code=403, detail="You don't have permission to edit configuration")
     
     config = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+    old_value = config.value if config else None
+    
     if not config:
         # Create new config
         config = SystemConfig(key=key, value=config_data.value, description=config_data.description)
@@ -68,6 +75,10 @@ def update_config(
     
     db.commit()
     db.refresh(config)
+    
+    # Audit log
+    log_config_change(current_user.email, key, old_value or "(new)", config_data.value)
+    
     return config
 
 @router.post("/", response_model=ConfigResponse)

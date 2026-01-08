@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI, configAPI } from '../services/api';
+import { trackAdminAction } from '../services/appInsights';
 import './Config.css';
 
 function Config() {
@@ -53,6 +54,9 @@ function Config() {
     try {
       await configAPI.update(config.key, config.value, config.description);
       setMessage({ text: `${config.key} saved!`, type: 'success' });
+      
+      // Track admin action
+      trackAdminAction(user.email, 'CONFIG_CHANGE', 'default', '', { config_key: config.key });
     } catch (err) {
       setMessage({ text: 'Failed to save', type: 'error' });
     } finally {
@@ -61,10 +65,14 @@ function Config() {
   };
 
   const handleRoleChange = async (userId, newRole) => {
+    const targetUser = users.find(u => u.id === userId);
     try {
       await userAPI.updateRole(userId, newRole);
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
       setMessage({ text: 'Role updated!', type: 'success' });
+      
+      // Track admin action
+      trackAdminAction(user.email, 'UPDATE_USER_ROLE', 'default', targetUser?.email || '', { new_role: newRole });
     } catch (err) {
       setMessage({ text: 'Failed to update role', type: 'error' });
     }
@@ -75,11 +83,16 @@ function Config() {
     navigate('/login');
   };
 
+  // Permission helpers
+  const canEditConfig = user?.role === 'admin';
+  const canChangeRoles = user?.role === 'admin';
+  const canAccessConfig = ['admin', 'manager'].includes(user?.role);
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
 
-  if (user?.role !== 'admin') {
+  if (!canAccessConfig) {
     return (
       <div className="forms-container">
         <nav className="nav-bar">
@@ -93,7 +106,7 @@ function Config() {
         <main className="config-main">
           <div className="access-denied">
             <h2>⚠️ Access Denied</h2>
-            <p>Admin privileges required to access this page.</p>
+            <p>Admin or Manager privileges required to access this page.</p>
           </div>
         </main>
       </div>
@@ -146,13 +159,15 @@ function Config() {
                       type="text"
                       value={config.value}
                       onChange={(e) => handleConfigChange(config.key, e.target.value)}
+                      disabled={!canEditConfig}
                     />
-                    <button onClick={() => saveConfig(config)} disabled={saving}>
-                      Save
+                    <button onClick={() => saveConfig(config)} disabled={saving || !canEditConfig}>
+                      {canEditConfig ? 'Save' : 'View Only'}
                     </button>
                   </div>
                 </div>
               ))}
+              {!canEditConfig && <p className="permission-note">⚠️ You have view-only access. Only Admins can edit configuration.</p>}
             </div>
           )}
 
@@ -176,9 +191,11 @@ function Config() {
                         <select
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          disabled={u.id === user.id}
+                          disabled={u.id === user.id || !canChangeRoles}
                         >
                           <option value="admin">Admin</option>
+                          <option value="manager">Manager</option>
+                          <option value="editor">Editor</option>
                           <option value="user">User</option>
                           <option value="viewer">Viewer</option>
                         </select>

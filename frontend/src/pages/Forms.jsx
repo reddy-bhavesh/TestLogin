@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../services/api';
+import { trackAdminAction } from '../services/appInsights';
 import './Forms.css';
 
 function Forms() {
@@ -8,6 +9,12 @@ function Forms() {
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
+    address: '',
+    city: '',
+    country: '',
+    department: '',
+    job_title: '',
+    date_of_birth: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +32,12 @@ function Forms() {
       setFormData({
         full_name: res.data.full_name || '',
         phone: res.data.phone || '',
+        address: res.data.address || '',
+        city: res.data.city || '',
+        country: res.data.country || '',
+        department: res.data.department || '',
+        job_title: res.data.job_title || '',
+        date_of_birth: res.data.date_of_birth || '',
       });
     } catch (err) {
       console.error('Failed to fetch user:', err);
@@ -47,6 +60,9 @@ function Forms() {
       const res = await userAPI.updateMe(formData);
       setUser(res.data);
       setMessage({ text: 'Profile updated successfully!', type: 'success' });
+      
+      // Track profile update
+      trackAdminAction(user.email, 'UPDATE_PROFILE', 'default', user.email);
     } catch (err) {
       setMessage({ text: err.response?.data?.detail || 'Failed to update profile', type: 'error' });
     } finally {
@@ -62,12 +78,16 @@ function Forms() {
       const res = await userAPI.uploadAvatar(file);
       setUser(res.data);
       setMessage({ text: 'Avatar uploaded successfully!', type: 'success' });
+      
+      // Track avatar upload
+      trackAdminAction(user.email, 'UPLOAD_AVATAR', 'default', user.email);
     } catch (err) {
       setMessage({ text: 'Failed to upload avatar', type: 'error' });
     }
   };
 
   const handleLogout = () => {
+    trackAdminAction(user?.email || 'unknown', 'USER_LOGOUT', 'default', user?.email || '');
     localStorage.removeItem('token');
     navigate('/login');
   };
@@ -114,28 +134,102 @@ function Forms() {
               <input type="email" id="email" value={user?.email || ''} disabled />
             </div>
 
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="full_name">Full Name</label>
+                <input
+                  type="text"
+                  id="full_name"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleChange}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="phone">Phone Number</label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+91 9876543210"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="date_of_birth">Date of Birth</label>
+                <input
+                  type="date"
+                  id="date_of_birth"
+                  name="date_of_birth"
+                  value={formData.date_of_birth}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="job_title">Job Title</label>
+                <input
+                  type="text"
+                  id="job_title"
+                  name="job_title"
+                  value={formData.job_title}
+                  onChange={handleChange}
+                  placeholder="Software Engineer"
+                />
+              </div>
+            </div>
+
             <div className="form-group">
-              <label htmlFor="full_name">Full Name</label>
+              <label htmlFor="department">Department</label>
               <input
                 type="text"
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
+                id="department"
+                name="department"
+                value={formData.department}
                 onChange={handleChange}
-                placeholder="Enter your full name"
+                placeholder="Engineering"
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone">Phone Number</label>
+              <label htmlFor="address">Address</label>
               <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
+                type="text"
+                id="address"
+                name="address"
+                value={formData.address}
                 onChange={handleChange}
-                placeholder="+91 9876543210"
+                placeholder="123 Main Street, Apt 4B"
               />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="city">City</label>
+                <input
+                  type="text"
+                  id="city"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  placeholder="Mumbai"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="country">Country</label>
+                <input
+                  type="text"
+                  id="country"
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  placeholder="India"
+                />
+              </div>
             </div>
 
             <div className="form-row">

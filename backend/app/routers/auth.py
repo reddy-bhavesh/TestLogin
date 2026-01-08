@@ -9,6 +9,7 @@ import os
 from app.models.database import get_db
 from app.models.user import User, UserRole
 from app.schemas import UserCreate, UserResponse, Token, LoginRequest
+from app.audit_logger import log_auth_event
 
 router = APIRouter()
 
@@ -77,6 +78,10 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    
+    # Audit log
+    log_auth_event(user_data.email, "USER_REGISTER", True)
+    
     return db_user
 
 @router.post("/login", response_model=Token)
@@ -89,6 +94,10 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         )
     
     access_token = create_access_token(data={"sub": user.email})
+    
+    # Audit log
+    log_auth_event(user.email, "USER_LOGIN", True)
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/token", response_model=Token)

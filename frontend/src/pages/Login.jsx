@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import { trackAuthEvent } from '../services/appInsights';
 import './Login.css';
 
 function Login() {
@@ -28,13 +29,16 @@ function Login() {
       if (isLogin) {
         const res = await authAPI.login(formData.email, formData.password);
         localStorage.setItem('token', res.data.access_token);
+        trackAuthEvent(formData.email, 'USER_LOGIN', true);
         navigate('/forms');
       } else {
         await authAPI.register(formData);
+        trackAuthEvent(formData.email, 'USER_REGISTER', true);
         setIsLogin(true);
         setError('Registration successful! Please login.');
       }
     } catch (err) {
+      trackAuthEvent(formData.email, isLogin ? 'USER_LOGIN' : 'USER_REGISTER', false);
       setError(err.response?.data?.detail || 'An error occurred');
     } finally {
       setLoading(false);
