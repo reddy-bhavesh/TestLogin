@@ -1,26 +1,27 @@
 # POC Web Application
 
-React + Python web app with MySQL database for Azure deployment.
+React + Python web app with PostgreSQL database for Azure deployment.
 
 ## Quick Start
 
 ```bash
-# Start all services (MySQL + Backend + Frontend)
+# Start all services (PostgreSQL + Backend + Frontend)
 docker-compose up --build
 
 # Access:
 # - Frontend: http://localhost:3000
 # - Backend API: http://localhost:8000/docs
-# - MySQL: localhost:3306
+# - PostgreSQL: localhost:5432
 ```
 
-### MySQL Credentials (Local Dev)
+### PostgreSQL Credentials (Local Dev)
 
 | Setting  | Value         |
 | -------- | ------------- |
 | Database | `poc_webapp`  |
 | User     | `pocuser`     |
 | Password | `pocpassword` |
+| Port     | `5432`        |
 
 ### First User = Admin
 
@@ -41,10 +42,11 @@ The first user to register automatically becomes an admin.
 az group create -n poc-webapp-rg -l centralindia
 az acr create -n pocwebappacr -g poc-webapp-rg --sku Basic
 
-# 2. Create Azure MySQL
-az mysql flexible-server create \
-  -n poc-webapp-mysql -g poc-webapp-rg -l centralindia \
-  --admin-user pocadmin --admin-password YourSecurePassword123!
+# 2. Create Azure PostgreSQL
+az postgres flexible-server create \
+  -n poc-webapp-postgres -g poc-webapp-rg -l centralindia \
+  --admin-user pocadmin --admin-password YourSecurePassword123! \
+  --sku-name Standard_B1ms --tier Burstable
 
 # 3. Build & push images
 az acr login -n pocwebappacr
@@ -57,7 +59,7 @@ docker push pocwebappacr.azurecr.io/frontend:v1
 az containerapp env create -n poc-env -g poc-webapp-rg -l centralindia
 az containerapp create -n poc-backend -g poc-webapp-rg --environment poc-env \
   --image pocwebappacr.azurecr.io/backend:v1 --target-port 8000 --ingress internal \
-  --env-vars DATABASE_URL="mysql+pymysql://pocadmin:YourSecurePassword123!@poc-webapp-mysql.mysql.database.azure.com:3306/poc_webapp"
+  --env-vars DATABASE_URL="postgresql://pocadmin:YourSecurePassword123!@poc-webapp-postgres.postgres.database.azure.com:5432/poc_webapp"
 az containerapp create -n poc-frontend -g poc-webapp-rg --environment poc-env \
   --image pocwebappacr.azurecr.io/frontend:v1 --target-port 80 --ingress external
 ```
@@ -66,5 +68,5 @@ az containerapp create -n poc-frontend -g poc-webapp-rg --environment poc-env \
 
 - **Frontend**: React 18 + Vite
 - **Backend**: Python FastAPI
-- **Database**: MySQL 8.0
+- **Database**: PostgreSQL 16
 - **Auth**: JWT tokens
