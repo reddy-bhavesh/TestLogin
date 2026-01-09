@@ -23,8 +23,8 @@ function Config() {
       const userRes = await userAPI.getMe();
       setUser(userRes.data);
 
-      if (userRes.data.role !== 'admin') {
-        setMessage({ text: 'Admin access required', type: 'error' });
+      if (!['admin', 'manager'].includes(userRes.data.role)) {
+        setMessage({ text: 'Access denied', type: 'error' });
         setLoading(false);
         return;
       }

@@ -4,7 +4,6 @@ Outputs JSON-formatted logs to stdout for Azure Container Apps Log Analytics
 """
 import logging
 import sys
-from datetime import datetime
 from pythonjsonlogger import jsonlogger
 
 # Create audit logger
@@ -47,7 +46,6 @@ def log_admin_action(
         "Action": action,
         "Target_Tenant": target_tenant or "default",
         "Target_User": target_user or "",
-        "Timestamp": datetime.utcnow().isoformat()
     }
     
     if details:
@@ -64,7 +62,6 @@ def log_auth_event(email: str, event_type: str, success: bool, ip_address: str =
         "Target_User": email,
         "Success": success,
         "IP_Address": ip_address or "unknown",
-        "Timestamp": datetime.utcnow().isoformat()
     }
     
     audit_logger.info(f"AUTH: {event_type}", extra=extra)
@@ -79,7 +76,6 @@ def log_config_change(admin_user: str, config_key: str, old_value: str, new_valu
         "Config_Key": config_key,
         "Old_Value": old_value,
         "New_Value": new_value,
-        "Timestamp": datetime.utcnow().isoformat()
     }
     
     audit_logger.info(f"CONFIG: Changed {config_key}", extra=extra)

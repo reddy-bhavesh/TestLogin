@@ -92,6 +92,9 @@ function Forms() {
     navigate('/login');
   };
 
+  // Permission check - viewer cannot edit profile
+  const canEditProfile = user?.role !== 'viewer';
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -112,7 +115,8 @@ function Forms() {
       <main className="forms-main">
         <div className="forms-card">
           <h2>User Profile</h2>
-          <p className="subtitle">Update your personal information</p>
+          <p className="subtitle">{canEditProfile ? 'Update your personal information' : 'View your personal information'}</p>
+          {!canEditProfile && <div className="message error">⚠️ You have view-only access. Your role does not allow profile editing.</div>}
 
           <div className="avatar-section">
             <div className="avatar">
@@ -122,10 +126,12 @@ function Forms() {
                 <span>{user?.full_name?.[0] || user?.email?.[0] || '?'}</span>
               )}
             </div>
-            <label className="btn-upload">
-              Upload Photo
-              <input type="file" accept="image/*" onChange={handleAvatarUpload} hidden />
-            </label>
+            {canEditProfile && (
+              <label className="btn-upload">
+                Upload Photo
+                <input type="file" accept="image/*" onChange={handleAvatarUpload} hidden />
+              </label>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="profile-form">
@@ -144,6 +150,7 @@ function Forms() {
                   value={formData.full_name}
                   onChange={handleChange}
                   placeholder="John Doe"
+                  disabled={!canEditProfile}
                 />
               </div>
               <div className="form-group">
@@ -155,6 +162,7 @@ function Forms() {
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="+91 9876543210"
+                  disabled={!canEditProfile}
                 />
               </div>
             </div>
@@ -168,6 +176,7 @@ function Forms() {
                   name="date_of_birth"
                   value={formData.date_of_birth}
                   onChange={handleChange}
+                  disabled={!canEditProfile}
                 />
               </div>
               <div className="form-group">
@@ -179,6 +188,7 @@ function Forms() {
                   value={formData.job_title}
                   onChange={handleChange}
                   placeholder="Software Engineer"
+                  disabled={!canEditProfile}
                 />
               </div>
             </div>
@@ -192,6 +202,7 @@ function Forms() {
                 value={formData.department}
                 onChange={handleChange}
                 placeholder="Engineering"
+                disabled={!canEditProfile}
               />
             </div>
 
@@ -204,6 +215,7 @@ function Forms() {
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="123 Main Street, Apt 4B"
+                disabled={!canEditProfile}
               />
             </div>
 
@@ -217,6 +229,7 @@ function Forms() {
                   value={formData.city}
                   onChange={handleChange}
                   placeholder="Mumbai"
+                  disabled={!canEditProfile}
                 />
               </div>
               <div className="form-group">
@@ -228,6 +241,7 @@ function Forms() {
                   value={formData.country}
                   onChange={handleChange}
                   placeholder="India"
+                  disabled={!canEditProfile}
                 />
               </div>
             </div>
@@ -245,9 +259,11 @@ function Forms() {
 
             {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
+            {canEditProfile && (
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
           </form>
         </div>
       </main>
