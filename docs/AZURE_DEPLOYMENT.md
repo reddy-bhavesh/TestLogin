@@ -7,7 +7,7 @@ Deploy the POC Web App to Azure Container Apps with your existing PostgreSQL dat
 ## Prerequisites
 
 - Azure CLI installed and logged in (`az login`)
-- Docker Desktop running
+- Docker Desktop (optional - only needed for local builds, see Step 2 Option A)
 - Your existing PostgreSQL connection string
 
 ---
@@ -73,6 +73,8 @@ az acr update -n pocwebappacr --admin-enabled true
 
 ## Step 2: Build and Push Docker Images
 
+### Option A: Build Locally (requires Docker)
+
 ```powershell
 # Login to your registry
 az acr login -n pocwebappacr
@@ -85,6 +87,20 @@ docker push pocwebappacr.azurecr.io/backend:v1
 docker build --build-arg DEPLOY_TARGET=azure -t pocwebappacr.azurecr.io/frontend:v1 ./frontend
 docker push pocwebappacr.azurecr.io/frontend:v1
 ```
+
+### Option B: Build in Azure Cloud (no Docker required)
+
+If you don't have Docker installed, Azure can build the images directly in the cloud:
+
+```powershell
+# Build backend in Azure (uploads source, builds in cloud, pushes to ACR)
+az acr build --registry pocwebappacr --image backend:v1 ./backend
+
+# Build frontend in Azure (with Azure target)
+az acr build --registry pocwebappacr --image frontend:v1 --build-arg DEPLOY_TARGET=azure ./frontend
+```
+
+> **Note:** This uploads your source code to Azure, builds it there, and stores in ACR - all without local Docker.
 
 ---
 
