@@ -81,8 +81,8 @@ az acr login -n pocwebappacr
 docker build -t pocwebappacr.azurecr.io/backend:v1 ./backend
 docker push pocwebappacr.azurecr.io/backend:v1
 
-# Build and push frontend (use Azure-specific Dockerfile)
-docker build -f ./frontend/Dockerfile.azure -t pocwebappacr.azurecr.io/frontend:v1 ./frontend
+# Build and push frontend (with Azure target)
+docker build --build-arg DEPLOY_TARGET=azure -t pocwebappacr.azurecr.io/frontend:v1 ./frontend
 docker push pocwebappacr.azurecr.io/frontend:v1
 ```
 
