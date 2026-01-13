@@ -41,3 +41,5 @@ backend/uploads/*
 # Misc
 *.bak
 *.tmp
+
+.env.azure

@@ -1,227 +1,168 @@
-# Azure Deployment Guide
+# Azure Container Apps Deployment Guide
 
-Deploy the POC Web App to Azure Container Apps with your existing PostgreSQL database.
+Complete guide for deploying the POC Web App to Azure Container Apps with layered security.
+
+## Architecture
+
+```
+Internet → Frontend (Nginx + React) → Backend (FastAPI) → PostgreSQL
+                    ↓
+           Security Layers:
+           - CORS (browser-level)
+           - API Key (app-level)
+           - IP Restrictions (network-level)
+```
+
+### Azure Resources
+
+| Resource           | Name              | Purpose                     |
+| ------------------ | ----------------- | --------------------------- |
+| Resource Group     | `rg-dummy-webapp` | Container for all resources |
+| Container Registry | `pocwebappacr`    | Docker image storage        |
+| Container Apps Env | `poc-env`         | Hosting environment         |
+| Container App      | `poc-frontend`    | React + Nginx proxy         |
+| Container App      | `poc-backend`     | FastAPI API server          |
 
 ---
 
 ## Prerequisites
 
-- Azure CLI installed and logged in (`az login`)
-- Docker Desktop (optional - only needed for local builds, see Step 2 Option A)
-- Your existing PostgreSQL connection string
+- Azure CLI installed
+- Docker Desktop installed
+- Azure Container Registry access
+- PostgreSQL database (existing)
 
 ---
 
-## Option A: Use Existing PostgreSQL Database
+## Quick Start
 
-If you already have an Azure PostgreSQL Flexible Server, you just need the connection string:
-
-```
-postgresql://<username>:<password>@<server-name>.postgres.database.azure.com:5432/<database-name>?sslmode=require
-```
-
-**Example:**
-
-```
-postgresql://pocadmin:YourPassword123!@mycompany-postgres.postgres.database.azure.com:5432/poc_webapp?sslmode=require
-```
-
-> **Note:** Azure PostgreSQL requires SSL. Add `?sslmode=require` to your connection string.
-
----
-
-## Option B: Create New PostgreSQL (Skip if using existing)
+### 1. Login
 
 ```powershell
-# Create resource group (skip if exists)
-az group create -n poc-webapp-rg -l centralindia
-
-# Create PostgreSQL Flexible Server
-az postgres flexible-server create `
-  -n poc-webapp-postgres `
-  -g poc-webapp-rg `
-  -l centralindia `
-  --admin-user pocadmin `
-  --admin-password YourSecurePassword123! `
-  --sku-name Standard_B1ms `
-  --tier Burstable `
-  --public-access 0.0.0.0
-
-# Create the database
-az postgres flexible-server db create `
-  -g poc-webapp-rg `
-  -s poc-webapp-postgres `
-  -d poc_webapp
+az login
+docker login pocwebappacr.azurecr.io -u pocwebappacr -p <ACR_PASSWORD>
 ```
 
----
-
-## Step 1: Create Azure Container Registry
+### 2. Build & Push Images
 
 ```powershell
-# Create resource group (skip if exists)
-az group create -n poc-webapp-rg -l centralindia
-
-# Create container registry
-az acr create -n pocwebappacr -g poc-webapp-rg --sku Basic
-
-# Enable admin access (needed for Container Apps)
-az acr update -n pocwebappacr --admin-enabled true
-```
-
----
-
-## Step 2: Build and Push Docker Images
-
-### Option A: Build Locally (requires Docker)
-
-```powershell
-# Login to your registry
-az acr login -n pocwebappacr
-
-# Build and push backend
+# Backend
 docker build -t pocwebappacr.azurecr.io/backend:v1 ./backend
 docker push pocwebappacr.azurecr.io/backend:v1
 
-# Build and push frontend (with Azure target)
+# Frontend (with Azure config)
 docker build --build-arg DEPLOY_TARGET=azure -t pocwebappacr.azurecr.io/frontend:v1 ./frontend
 docker push pocwebappacr.azurecr.io/frontend:v1
 ```
 
-### Option B: Build in Azure Cloud (no Docker required)
-
-If you don't have Docker installed, Azure can build the images directly in the cloud:
+### 3. Create Environment
 
 ```powershell
-# Build backend in Azure (uploads source, builds in cloud, pushes to ACR)
-az acr build --registry pocwebappacr --image backend:v1 ./backend
-
-# Build frontend in Azure (with Azure target)
-az acr build --registry pocwebappacr --image frontend:v1 --build-arg DEPLOY_TARGET=azure ./frontend
+az containerapp env create -n poc-env -g rg-dummy-webapp -l centralindia
 ```
 
-> **Note:** This uploads your source code to Azure, builds it there, and stores in ACR - all without local Docker.
-
----
-
-## Step 3: Create Container Apps Environment
+### 4. Deploy Backend
 
 ```powershell
-# Create the environment
-az containerapp env create `
-  -n poc-env `
-  -g poc-webapp-rg `
-  -l centralindia
-```
-
----
-
-## Step 4: Deploy Backend
-
-Replace `<YOUR_DATABASE_URL>` with your actual connection string:
-
-```powershell
-# Get ACR credentials
 $acrPassword = az acr credential show -n pocwebappacr --query "passwords[0].value" -o tsv
 
-# Deploy backend
 az containerapp create `
-  -n poc-backend `
-  -g poc-webapp-rg `
+  -n poc-backend -g rg-dummy-webapp `
   --environment poc-env `
   --image pocwebappacr.azurecr.io/backend:v1 `
-  --target-port 8000 `
-  --ingress internal `
+  --target-port 8000 --ingress external `
   --registry-server pocwebappacr.azurecr.io `
   --registry-username pocwebappacr `
   --registry-password $acrPassword `
-  --env-vars DATABASE_URL="<YOUR_DATABASE_URL>" SECRET_KEY="your-production-secret-key"
+  --min-replicas 1 `
+  --env-vars DATABASE_URL="<YOUR_DB_URL>" SECRET_KEY="<SECRET>"
 ```
 
-**Example with existing database:**
+### 5. Deploy Frontend
 
 ```powershell
 az containerapp create `
-  -n poc-backend `
-  -g poc-webapp-rg `
-  --environment poc-env `
-  --image pocwebappacr.azurecr.io/backend:v1 `
-  --target-port 8000 `
-  --ingress internal `
-  --registry-server pocwebappacr.azurecr.io `
-  --registry-username pocwebappacr `
-  --registry-password $acrPassword `
-  --env-vars DATABASE_URL="postgresql://pocadmin:MyPassword@myserver.postgres.database.azure.com:5432/poc_webapp?sslmode=require" SECRET_KEY="change-this-in-production"
-```
-
----
-
-## Step 5: Deploy Frontend
-
-```powershell
-# Get backend URL
-$backendUrl = az containerapp show -n poc-backend -g poc-webapp-rg --query "properties.configuration.ingress.fqdn" -o tsv
-
-# Deploy frontend
-az containerapp create `
-  -n poc-frontend `
-  -g poc-webapp-rg `
+  -n poc-frontend -g rg-dummy-webapp `
   --environment poc-env `
   --image pocwebappacr.azurecr.io/frontend:v1 `
-  --target-port 80 `
-  --ingress external `
+  --target-port 80 --ingress external `
   --registry-server pocwebappacr.azurecr.io `
   --registry-username pocwebappacr `
   --registry-password $acrPassword
 ```
 
----
-
-## Step 6: Get Your App URL
+### 6. Get URLs
 
 ```powershell
-az containerapp show -n poc-frontend -g poc-webapp-rg --query "properties.configuration.ingress.fqdn" -o tsv
+az containerapp show -n poc-frontend -g rg-dummy-webapp --query "properties.configuration.ingress.fqdn" -o tsv
+az containerapp show -n poc-backend -g rg-dummy-webapp --query "properties.configuration.ingress.fqdn" -o tsv
 ```
 
-Your app will be available at: `https://poc-frontend.<random>.centralindia.azurecontainerapps.io`
+---
+
+## Security Configuration
+
+### Layer 1: CORS
+
+**Azure Portal** → `poc-backend` → Networking → CORS:
+
+- Allowed Origins: `https://<frontend-url>`
+- Methods: GET, POST, PUT, DELETE, OPTIONS
+- Headers: \*
+- Credentials: ✅
+
+### Layer 2: API Key
+
+1. Add secret to backend:
+
+```powershell
+az containerapp secret set -n poc-backend -g rg-dummy-webapp --secrets api-key="<YOUR_KEY>"
+az containerapp update -n poc-backend -g rg-dummy-webapp --set-env-vars API_KEY=secretref:api-key
+```
+
+2. Backend validates `X-API-KEY` header on `/api/` routes
+3. Frontend nginx injects header on proxy requests
+
+### Layer 3: IP Restrictions
+
+1. Get frontend IPs:
+
+```powershell
+az containerapp show -n poc-frontend -g rg-dummy-webapp --query "properties.outboundIpAddresses" -o tsv
+```
+
+2. **Azure Portal** → `poc-backend` → Ingress → IP Restrictions:
+   - Mode: Allow configured IPs, deny all others
+   - Add each frontend IP as allow rule
 
 ---
 
-## Firewall: Allow Container Apps to Access PostgreSQL
-
-If using Azure PostgreSQL, you need to allow access from Container Apps:
+## Updating
 
 ```powershell
-# Allow Azure services
-az postgres flexible-server firewall-rule create `
-  -g poc-webapp-rg `
-  -n poc-webapp-postgres `
-  -r AllowAzureServices `
-  --start-ip-address 0.0.0.0 `
-  --end-ip-address 0.0.0.0
+# Rebuild and push
+docker build -t pocwebappacr.azurecr.io/backend:v2 ./backend
+docker push pocwebappacr.azurecr.io/backend:v2
+
+# Update container app
+az containerapp update -n poc-backend -g rg-dummy-webapp --image pocwebappacr.azurecr.io/backend:v2
 ```
 
 ---
 
 ## Troubleshooting
 
-### Check backend logs
-
 ```powershell
-az containerapp logs show -n poc-backend -g poc-webapp-rg --follow
+# View logs
+az containerapp logs show -n poc-backend -g rg-dummy-webapp --tail 50
+
+# Check status
+az containerapp revision list -n poc-backend -g rg-dummy-webapp -o table
 ```
 
-### Check if database is reachable
-
-If you get connection errors, verify:
-
-1. Firewall rules allow Azure services
-2. SSL mode is set in connection string
-3. Database name exists
-
-### Update environment variables
-
-```powershell
-az containerapp update -n poc-backend -g poc-webapp-rg `
-  --set-env-vars DATABASE_URL="new-connection-string"
-```
+| Issue             | Solution                 |
+| ----------------- | ------------------------ |
+| 401 Unauthorized  | API key mismatch         |
+| 403 Forbidden     | IP not allowed           |
+| 404 Not Found     | Check nginx proxy config |
+| Container stopped | Set `--min-replicas 1`   |
